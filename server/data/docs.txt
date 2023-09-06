@@ -1,0 +1,1041 @@
+SUN.io Overview
+​ is a TRON-powered DeFi platform that integrates token swap, liquidity mining, stablecoin swap, and self-governance. Drawing on the strengths of various trading protocols, SUN.io is able to offer high performance, best prices, and enhanced security.
+This document describes the technical implementation and smart contract logic of the SUN.io protocol. It helps SUN.io developers with open-source contribution while allowing third-party developers to integrate SUN.io's functionality into their own applications.
+NOTE:
+All code starting with $ runs in a computer terminal; code starting with >>> runs in NodeJS. Readers are assumed to have some basic knowledge in TronWeb, which is used in code cited in this document.StableSwap Overview
+StableSwap protocol keywords: Automated market maker (AMM), liquidity pool and swap
+Background
+As stablecoins evolve, the popular TRC20-USDT is no longer alone on TRON. TRON's expanding stablecoin family has welcomed USDJ, TUSD, USDC, USDD, and other new members. The growing market share and variety of stablecoins have given rise to more complex demand for swapping between different stablecoins. SUN.io's StableSwap protocol is designed to provide swap services for stablecoins or tokens of equivalent value, and it offers lower fees and slippage than competitors in the market in the following ways:
+Slippage of StableSwap can be reduced to zero when there are sufficient tokens in the liquidity pool;
+StableSwap will increase the transaction price of a token to avoid depletion of its supply in the liquidity pool.
+Mechanism
+To maintain the transaction price at 1, the most straightforward way is to use the equation of a straight line with a slope of -1 (i.e. x + y = k). The price should also be able to adjust itself to avoid liquidity depletion, which requires the constant product formula x * y = k. The StableSwap protocol incorporates both constant sum and constant product. Its model can be simply regarded as the weighted sum of a constant sum and a constant product, as described by the market making formula in the .
+ 
+According to the above formula, token swaps have an impact on the value of 
+x 
+i
+ 
+. Take 2pool (USDD, USDT) as an example: suppose the amount before the transaction is 
+(
+1
+,
+2
+)
+(x 
+1
+​
+ ,x 
+2
+​
+ )
+.  When a user swaps 
+1
+′
+−
+1
+x 
+1
+′
+ 
+​
+ −x 
+1
+​
+USDD for USDT, the value of 
+1
+x 
+1
+​
+will change to 
+1
+′
+x 
+1
+′
+ 
+​
+ 
+. Substitute 
+1
+′
+x 
+1
+′
+ 
+​
+into the above equation and you will get the new 
+2
+′
+x 
+2
+′
+ 
+​
+ 
+, and 
+2
+−
+2
+′
+x 
+2
+​
+ −x 
+2
+′
+ 
+​
+represents the amount of USDT the user will obtain. The values of both 
+A
+ and 
+D
+ remain unchanged during the calculation. 
+A
+ is a constant, and the value of 
+D
+ can be found with a given 
+x 
+i
+​
+using Newton's Method.
+ 
+Let 
+=
+∑
+=
+1
+,
+=
+0
+0
+∏
+=
+1
+S=∑ 
+i=1
+n
+​
+ x 
+i
+​
+ ,D 
+p
+​
+ = 
+n 
+n
+ ∏ 
+i=1
+n
+​
+ x 
+i
+​
+ 
+D 
+0
+​
+ D 
+0
+n
+​
+ 
+​
+ 
+, Substitute these expressions into the above equation and you can get:
+The corresponding contract code is shown below:
+def get_D(xp: uint256[N_COINS], amp: uint256) -> uint256:
+    S: uint256 = 0
+    for _x in xp:
+        S += _x
+    if S == 0:
+        return 0
+​
+    Dprev: uint256 = 0
+    D: uint256 = S
+    Ann: uint256 = amp * N_COINS
+    for _i in range(255):
+        D_P: uint256 = D
+        for _x in xp:
+            D_P = D_P * D / (_x * N_COINS)       Dprev = D
+        D = (Ann * S + D_P * N_COINS) * D / ((Ann - 1) * D + (N_COINS + 1) * D_P)
+        if D > Dprev:
+            if D - Dprev <= 1:
+                break
+        else:
+            if Dprev - D <= 1:
+                break
+    return D
+​
+Liquidity Pool
+The StableSwap contract of SUN.io allows users to swap between stablecoins and add or remove liquidity. Its USDD-USDT liquidity pool, USDJ-TUSD-USDT liquidity pool, and USDC liquidity pool are now available on the TRON MainNet.
+USDD-USDT pool
+MainNet contract address: TNTfaTpkdd4AQDeqr8SGG7tgdkdjdhbP5c
+USDJ-TUSD-USDT pool
+MainNet contract address: TKcEU8ekq2ZoFzLSGFYCUY6aocJBX9X31b
+USDC pool
+MainNet contract address: TNTfaTpkdd4AQDeqr8SGG7tgdkdjdhbP5c
+Interact with Contract
+We utilize TronWeb to facilitate interaction with on-chain contracts. First, you need to initialize the TronWeb instance.
+const TronWeb = require('tronweb')
+const privateKey = process.env.PRIVATE_KEY
+const apiKey = process.env.API_KEY
+​
+var tronWeb = new TronWeb({
+	fullHost: "https://api.trongrid.io",
+	headers: { "TRON-PRO-API-KEY": apiKey },
+	privateKey: privateKey,
+      })
+Get Liquidity Pool's Information
+Get a liquidity's token address
+Function: coins(uint256)
+Parameter: The i-th token of the stablecoin pool
+>>> let contract = await tronWeb.getContract('TNTfaTpkdd4AQDeqr8SGG7tgdkdjdhbP5c')
+>>> await contract.methods.coins(0).call() 
+TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t 
+Get a liquidity pool's size
+Function: balances(uint256)
+Parameter: The i-th token of the stablecoin pool
+>>> let contract = await tronWeb.getContract('TNTfaTpkdd4AQDeqr8SGG7tgdkdjdhbP5c')
+>>> await contract.methods.balances(0).call()
+1000000000000
+Get a liquidity pool's LP token address
+Function: lp_token()
+Parameter: No input parameters
+>>> let contract = await tronWeb.getContract('TNTfaTpkdd4AQDeqr8SGG7tgdkdjdhbP5c')
+>>> await contract.methods.lp_token().call() 
+TD3et9gS2pYz46ZC2mkCfYcKQGNwrnBLef 
+Get A's value
+Function: A()
+Parameter: No input parameters
+>>> let contract = await tronWeb.getContract('TNTfaTpkdd4AQDeqr8SGG7tgdkdjdhbP5c')
+>>> await contract.methods.A().call()
+300
+Execute Transaction
+Get the amount of Token to swap for
+Function: get_dy(uint128,uint128,uint256)
+Parameters: In-pool sequence number of the token to be sold, in-pool sequence number of the token to be bought, amount of the token to be sold
+>>> let contract = await tronWeb.getContract('TNTfaTpkdd4AQDeqr8SGG7tgdkdjdhbP5c')
+>>> await contract.methods.get_dy(0, 1, 100).send() 
+103
+Swap
+Function: exchange(uint128,uint128,uint256,uint256)
+Parameters: In-pool sequence number of the token to be sold, in-pool sequence number of the token to be bought, amount of the token to be sold, minimum amount expected to get
+>>> let contract = await tronWeb.getContract('TNTfaTpkdd4AQDeqr8SGG7tgdkdjdhbP5c')
+>>> await contract.methods.exchange(0, 1, 100, 99).send() 
+Add & Remove Liquidity
+Add liquidity
+Function: add_liquidity(uint256[n],uint256)
+Parameters: Amount of all tokens to add, minimum LP token amount expected to get
+>>> let contract = await tronWeb.getContract('TNTfaTpkdd4AQDeqr8SGG7tgdkdjdhbP5c')
+>>> await contract.methods.add_liquidity(100, 100, 299).send() 
+Remove liquidity
+Function: remove_liquidity(uint256, uint256[n])
+Parameters: LP token amount to remove, minimum token amount expected to get
+>>> let contract = await tronWeb.getContract('TNTfaTpkdd4AQDeqr8SGG7tgdkdjdhbP5c')
+>>> await contract.methods.remove_liquidity(299.9, 100, 100).send() SunSwap Overview
+SunSwap protocol keywords: Automated market maker (AMM), liquidity pool and swap
+Background
+SunSwap AMM (automated market maker) adopts the most used trading model in the world of DeFi today. Unlike the order book, AMMs utilize the constant product model to calculate tokens in the pool, where trades are automatically executed, and the liquidity supply of the trading pair is ensured.
+Anyone can deposit a token into a pool in exchange for the pool's dedicated token (LP token) of an equivalent value, and thus become a liquidity provider (LP) for the pool.  The amount of the LP token received divided by the pool's total LP reserves represents the liquidity provider's share of assets in the pool, and the liquidity provider can redeem the above assets at any time.  
+Mechanism
+Swapping is based on the constant product formula, with x and y representing the amount of two different tokens (assumed to be token X and token Y), then:
+If we want to swap X for Y from the liquidity pool, and assume that the amount of X entered is Δx and the amount of Y obtained is Δy, provided that the pool has sufficient funds, then:This means that the product of the two tokens in the liquidity pool remains unchanged after the transaction. In this case, if the volume of a transaction only accounts for a minimal fraction of the liquidity pool's total volume, then the transaction price will approximate the ratio of the two tokens' amount:
+However, the price of y in the liquidity pool is 
+y
+x
+​
+before the swap. This results in a slippage of y's price:
+The larger the transaction volume Δx, the greater the slippage and the more the transaction price deviates from the actual price; likewise, more funds and greater depth in the pool can reduce the slippage and thus lower the losses for users. In actual SunSwap transactions, a 0.3% fee will be deducted before the calculation.
+Example: Suppose the liquidity pool has 100 X and 1 Y. If a user wants to trade 20 X, then the actual amount of X traded will be 19.94 X (net of a 0.3% fee), according to the formula x ∗ y = k:
+Liquidity Pool
+The SunSwap contract of SUN.io allows users to swap between regular tokens and add and remove liquidity. Its V1 and V2 contracts are now running on the TRON MainNet.
+V1
+Factory contract address: TXk8rQSAvPvBBNtqSoY6nCfsXWCSSpTVQF
+V2
+Factory contract address: TKWJdrQkqHisa1X8HUdHEfREvTzw4pMAaY
+Router contract address: TKzxdSv2FZKQrEqkKVgp5DcwEXBEKMg2Ax
+Interact with Contract
+We utilize TronWeb to facilitate interaction with on-chain contracts. First, you need to initialize the TronWeb instance.
+const TronWeb = require('tronweb')
+const privateKey = process.env.PRIVATE_KEY
+const apiKey = process.env.API_KEY
+​
+var tronWeb = new TronWeb({
+	fullHost: "https://api.trongrid.io",
+	headers: { "TRON-PRO-API-KEY": apiKey },
+	privateKey: privateKey,
+      })
+Get Liquidity Pool's Information
+Get a liquidity pool's address in V1
+Function: getExchange(address)
+Parameter: Token address
+>>> let contract = await tronWeb.getContract('TXk8rQSAvPvBBNtqSoY6nCfsXWCSSpTVQF')
+>>> await contract.methods.getExchange('TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t').call() 
+0x4cAD2750821493b093133B7bf10568bAEc000971
+Get a liquidity pool's address in V2
+Function: getPair(address, address)
+Parameter: token0's address, token1's address
+>>> let contract = await tronWeb.getContract('TKWJdrQkqHisa1X8HUdHEfREvTzw4pMAaY')
+>>> await contract.methods.getPair('TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t', 'TNUC9Qb1rRpS5CbWLmNMxXBjyFoydXjWFR') 
+0x4cAD2750821493b093133B7bf10568bAEc000971
+Execute Transactions
+Sell TRX to buy Token in V1
+Function: trxToTokenTransferInput(uint256, uint256, address)
+Parameters: minimum Token amount expected to buy, time window, recipient's address
+let contract = await tronWeb.getContract('TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE')
+>>> await contract.methods.trxToTokenTransferInput(100, 1662825600, 'TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE')
+Sell Token to buy TRX in V1
+Function: tokenToTrxTransferInput(uint256, uint256, uint256, address)
+Parameters: Amount of Token to sell, minimum TRX amount expected to buy, time window, recipient's address
+>>> let contract = await tronWeb.getContract('TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE')
+>>> await contract.methods.tokenToTrxTransferInput(100, 1500, 1662825600, 'TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE') 
+Sell Token to buy Token in V1
+Function: tokenToTokenSwapInput( uint256, uint256, uint256, uint256, address)
+Parameters: Amount of Token to sell, minimum Token amount expected to buy, minimum Token amount expected to buy, time window, recipient's address
+>>> let contract = await tronWeb.getContract('TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE')
+>>> await contract.methods.tokenToTokenSwapInput(100, 100， 1500，1662825600，'TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE') 
+Sell Token to buy Token in V2
+Function: swapExactTokensForTokens( uint, uint, address[], address, uint)
+Parameters: Amount of Token to sell, minimum Token amount expected to buy, swap route, recipient's address, time window
+>>> let contract = await tronWeb.getContract('TKzxdSv2FZKQrEqkKVgp5DcwEXBEKMg2Ax')
+>>> await contract.methods.swapExactTokensForTokens(1000000000000000000,1000000,['TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf','TF17BgPaZYbz8oxbjhriubPDsA7ArKoLX3'],'TF5MekHgFz6neU7zTpX4h2tha3mijDUj3z',1662825600)
+Sell TRX to buy Token in V2
+Function: swapExactETHForTokens(uint, address[], address, uint)
+Parameters: Token amount expected to buy, swap route, recipient's address, time window
+>>> let contract = await tronWeb.getContract('TKzxdSv2FZKQrEqkKVgp5DcwEXBEKMg2Ax')
+>>> await contract.methods.swapExactETHForTokens(100000000,1,['TYsbWxNnyTgsZaTFaue9hqpxkU3Fkco94a','TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf'],'TF5MekHgFz6neU7zTpX4h2tha5miPDUj3z',1662825600)
+Sell Token to buy TRX in V2
+Function: swapExactTokensForETH(uint, uint, address[] , address, uint)
+Parameters: Amount of Token to sell, minimum TRX amount expected to buy, swap route, buyer's address, time window
+>>> let contract = await tronWeb.getContract('TKzxdSv2FZKQrEqkKVgp5DcwEXBEKMg2Ax')
+>>> await contract.methods.swapExactTokensForETH(1000000,1000000,['TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf','TYsbWxNnyTgsZaTFaue9hqpxkU3Fkco94a'],'TF5MekHgFz6neU7zTpX4h2tha5miPDUj3z',1662825600)
+Add & Remove Liquidity
+Add liquidity in V1
+Function: addLiquidity(uint256, uint256, uint256)
+Parameters: Minimum liquidity amount expected to get, maximum liquidity amount to add, time window
+>>> let contract = await tronWeb.getContract('TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE')
+>>> await contract.methods.addLiquidity(100， 100， 1662825600) 
+Remove liquidity in V1
+Function: removeLiquidity(uint256, uint256,uint256, uint256)
+Parameters: Liquidity amount to remove, minimum TRX amount expected to get, minimum token amount expected to get, time window
+>>> let contract = await tronWeb.getContract('TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE')
+>>> await contract.methods.removeLiquidity(100, 100, 100, 1662825600) 
+Add liquidity in V2
+Function: addLiquidity(address,address,uint,uint,uint,uint,address,uint)
+Parameters: tokenA's address, tokenB's address, tokenA's amount expected to add, tokenB's amount expected to add, minimum receiving amount of the tokenA added, minimum receiving amount of the tokenB added, target liquidity pool's address, time window
+>>> let contract = await tronWeb.getContract('TKzxdSv2FZKQrEqkKVgp5DcwEXBEKMg2Ax')
+>>> await contract.methods.addLiquidity('TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf','TF17BgPaZYbz8oxbjhriubPDsA7ArKoLX3',100000000,27661108481018349141,5000000,200000000000000000000,TF5MekHgFz6neU7zTpX4h2tha5miPDUj3z,1662825600)
+Remove liquidity in V2
+Name: removeLiquidity(address,address,uint,uint,uint,address,uint)
+Parameters: tokenA's address, tokenB's address, amount of liquidity to remove, minimum tokenA amount expected to get, minimum tokenB amount expected to get, token's receiving address, time window
+>>> let contract = await tronWeb.getContract('TKzxdSv2FZKQrEqkKVgp5DcwEXBEKMg2Ax')
+>>> await contract.methods.removeLiquidity('TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf','TF17BgPaZYbz8oxbjhriubPDsA7ArKoLX3',100000000,1,1,TF5MekHgFz6neU7zTpX4h2tha5miPDUj3z,1962825600)SunSwap V3 Overview
+Keywords of SunSwap V3: market making model, liquidity pool, and swap
+Background
+While SunSwap V2 achieved remarkable success in decentralized trading, it also has its limitations. One of its key drawbacks is the underutilization of liquidity. To address this issue, SunSwap V3 introduces a concept called concentrated capital efficiency. This mechanism empowers liquidity providers to concentrate their funds within a specific price range, thereby allowing them to provide liquidity more effectively and earn higher rewards within a price range featuring high price volatility.
+Developed by the SUN.io team, SunSwap V3 was launched in June 2023. It introduces a new trading model called "concentrated liquidity". With this new model, liquidity providers can allocate their funds to a specific price range rather than a fixed trading pair, which improves the efficiency of liquidity and offers better prices for traders. SunSwap V3 has also introduced flexible fee tiers, allowing liquidity providers to set different fee rates for different price ranges accordingly, which generates higher returns for liquidity providers and incentivizes them to provide more liquidity.
+Mechanism
+The swap logic can be inferred from the constant product formula. Here, x and y represent the respective reserve balance of the tokens involved (token0 and token1): 
+L stands for liquidity, and the liquidity of a pool can be calculated from the reserve balance of the tokens involved. Based on the formula, the product of x and y (denoted as k) remains constant. 
+Therefore, we can measure the liquidity of a pool by 
+xy
+​
+ L is actually the geometric mean of x and y. 
+Dividing y by x, we can get the prices of token0 and token1. Since the prices of the two tokens in the pool are reciprocal to each other, we'll only use one of them when doing the calculation (SunSwap V3 uses y/x).
+ L also indicates the relation between the change of the output amount and the change of p: 
+p
+​
+ 
+​
+​Proof：
+ 
+​
+=
+0
+0
+=
+1
+1
+xy
+​
+ = 
+x 
+0
+​
+ y 
+0
+​
+ 
+​
+ = 
+x 
+1
+​
+ y 
+1
+​
+ 
+​
+ 
+，, thus:Contract Addresses
+Factory
+Contract address on the Mainnet: TThJt8zaJzJMhCEScH7zWKnp5buVZqys9x
+Contract address on Nile Testnet: TUTGcsGDRScK1gsDPMELV2QZxeESWb1Gac
+SwapRouter
+Contract address on the Mainnet: TQAvWQpT9H916GckwWDJNhYZvQMkuRL7PN 
+Contract address on Nile Testnet: TFkswj6rUfK3cQtFGzungCkNXxD2UCpEVD NonfungiblePositionManager
+Contract address on the Mainnet: TLSWrv7eC1AZCXkRjpqMZUmvgd99cj7pPF
+Contract address on Nile Testnet: TPQzqHbCzQfoVdAV6bLwGDos8Lk2UjXz2R
+Interact with Contract
+We utilize TronWeb to facilitate interaction with on-chain contracts. First, you need to initialize the TronWeb instance.
+const TronWeb = require('tronweb')
+const privateKey = process.env.PRIVATE_KEY
+const apiKey = process.env.API_KEY
+​
+var tronWeb = new TronWeb({
+	fullHost: "https://api.trongrid.io",
+	headers: { "TRON-PRO-API-KEY": apiKey },
+	privateKey: privateKey,
+      })
+Make queries
+Query the address of the liquidity pool
+Name：getPool(address,address,uint24)
+Contract called: Factory
+Parameters: address of token0, address of token1, and fee rate 
+Returned value: address of pool
+>>> let contract = await tronWeb.getContract('TThJt8zaJzJMhCEScH7zWKnp5buVZqys9x')
+>>> await contract.methods.getPool('TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',‘TPYmHEhy5n8TCEfYGqW2rPxsghSfzghPDn’,100).call()
+0x839538A1B5E9B57C639035A453E07C9A4309F9D9
+Query the details of pool
+Name: slot0()
+Contract called: the pool contract (accessible via factory)  
+Parameters: N/A
+Returned values: 1. current price (which equals sqrtPriceX96 squared divided by 2 to the power of 192); 2. current tick;  3. the latest index of the observation array; 4. maximum cardinality of the observations currently stored; 5. maximum cardinality that is triggered in the observation and is to be stored next; 6. percentage of the current protocol fee in the swap fee at the time of withdrawal; 7. whether the pool is locked
+>>> let contract = await tronWeb.getContract('TSUUVjysXV8YqHytSNjfkNXnnB49QDvZpx')
+>>> await contract.methods.slot0().call()
+[
+  sqrtPriceX96: BigNumber { _hex: '0x4714a6b4d8e3d1ab6bcfbe0c', _isBigNumber: true },
+  tick: -25629,
+  observationIndex: 0,
+  observationCardinality: 1,
+  observationCardinalityNext: 1,
+  feeProtocol: 0,
+  unlocked: true
+]
+​
+Query a user’s tokenId
+​
+Name: tokenOfOwnerByIndex(address,uint256) 
+Contract called: NonfungiblePositionManager
+Parameters: user's address, user's nth proof of liquidity
+Returned value: tokenId
+>>> let contract = await tronWeb.getContract('TLSWrv7eC1AZCXkRjpqMZUmvgd99cj7pPF')
+>>> await contract.methods.tokenOfOwnerByIndex('TF5MekHgFz6neU7zTpX4h2tha5miPDUj3z',0).call()
+1
+Query the details of a user’s liquidity
+Name: positions(uint256)
+Contract called: NonfungiblePositionManager 
+Parameter: tokenId
+Returned values: 1. nonce; 2. address authorized by the tokenId; 3. address of token0 in the pool; 4. address of token1 in the pool; 5. fee rate in the pool; 6. lowest price for the position selected; 7. highest price for the position selected; 8. liquidity; 9. 10. fee growth in all positions at the time the latest change was made to a single position; 11. 12. amount of uncollected tokens owed by this position as of the previous calculation
+>>> let contract = await tronWeb.getContract('TLSWrv7eC1AZCXkRjpqMZUmvgd99cj7pPF')
+>>> await contract.methods.positions (1).call()
+[
+  nonce: 0
+  operator: T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb
+  token0: TF9io9LGyjuK3uTpr73pAaQ5m9scxd9xvr
+  token1: TK8E3sFhBt3EB6gTT6d6co8RMB6DFUnNwE
+  fee: 3000
+  tickLower: -283380
+  tickUpper: -269520
+  liquidity: 1390641886550414128
+  feeGrowthInside0LastX128: 0
+  feeGrowthInside1LastX128: 540564213145032425660083902
+  tokensOwed0: 0
+  tokensOwed1: 0
+]
+Execute transactions
+Make a transaction
+Name: exactInput(ExactInputParams) 
+Contract called: SwapRouter
+Parameters: [encode of the path, user's address, deadline]
+>>> let contract = await tronWeb.getContract('TQAvWQpT9H916GckwWDJNhYZvQMkuRL7PN')
+>>> await contract.methods.exactInput(['0xe518c608a37e2a262050e10be0c9d03c7a0877f3000bb843c42f702b0a11565c46e34022aab677d7bd8ae3','TF5MekHgFz6neU7zTpX4h2tha5miPDUj3z',1662825600])
+Add liquidity
+Name: increaseLiquidity(IncreaseLiquidityParams) 
+Contract called: NonfungiblePositionManager
+Parameters: [tokenId, amount of token0 to be added, amount of token1 to be added, minimum amount of token0 to be added, minimum amount of token1 to be added, deadline]
+>>> let contract = await tronWeb.getContract('TLSWrv7eC1AZCXkRjpqMZUmvgd99cj7pPF')
+>>> await contract.methods.increaseLiquidity(1,'1000000000000000000','1000000000000000000'，1，1，1662825600)
+Reduce liquidity
+Name: decreaseLiquidity(DecreaseLiquidityParams) 
+Contract called: NonfungiblePositionManager
+Parameters: [tokenId, liquidity to be removed, minimum amount of token0 to be obtained, minimum amount of token1 to be obtained, deadline]
+>>> let contract = await tronWeb.getContract('TLSWrv7eC1AZCXkRjpqMZUmvgd99cj7pPF')
+>>> await contract.methods.decreaseLiquidity(1,'1390641886550414128',1，1，1662825600)
+Collect rewards
+Name: collect(CollectParams)
+Contract called: NonfungiblePositionManager
+Parameters: [tokenId, address to receive rewards, maximum amount of token0 reward, maximum amount of token1 reward]
+>>> let contract = await tronWeb.getContract('TLSWrv7eC1AZCXkRjpqMZUmvgd99cj7pPF')
+>>> await contract.methods.collect(1,'TF5MekHgFz6neU7zTpX4h2tha5miPDUj3z',‘100000000000000000000000000’，‘100000000000000000000000000’)Smart Router
+A tool that provides better trading strategy
+Background
+To help users boost returns, SUN.io has rolled out the Smart Router feature, which plays an essential role in the following aspects: 
+Executing trades at the best price: The Smart Router finds the best price for traders by choosing the optimal path to execute trades based on the price difference across markets. This means users get more favorable trade prices at execution to maximize returns. 
+Enhancing liquidity: The Smart Router utilizes the liquidity of different markets to provide better depth and liquidity for traders. By executing trades across multiple liquidity pools, it reduces slippage and market shocks, thus offering an enhanced trading experience. 
+Improving liquidity utilization: The Smart Router helps improve the utilization of liquidity. By channeling liquidity from highly liquid markets to less liquid ones, it helps improve the overall utilization of liquidity and enables the completion of more trades. 
+Mechanism
+How the Smart Router works
+SUN.io's Smart Router algorithm service retrieves data from SunSwap V1, SunSwap V2, SunSwap V3, PSM, and SunCurve by utilizing the contract image built on the server. It sorts trade paths by the amount of the token users can obtain and displays the top three as options for users. The contract of the Smart Router is a nested contract through which the liquidity pools on SunSwap V1, SunSwap V2, SunSwap V3, PSM, and SunCurve can be called to complete trades.
+Smart Router Contract
+Contract address on Mainnet: TFVisXFaijZfeyeSjCEVkHfex7HGdTxzF9
+Contract address on Nile testnet: TB6xBCixqRPUSKiXb45ky1GhChFJ7qrfFj
+Smart Router Algorithm Service
+Smart Router algorithm service URL: ​
+Contract Interaction
+We utilize TronWeb to facilitate interaction with on-chain contracts. First, you need to initialize the TronWeb instance.
+const TronWeb = require('tronweb')
+const privateKey = process.env.PRIVATE_KEY
+const apiKey = process.env.API_KEY
+​
+var tronWeb = new TronWeb({
+	fullHost: "https://api.trongrid.io",
+	headers: { "TRON-PRO-API-KEY": apiKey },
+	privateKey: privateKey,
+      })
+Get Smart Router Info
+Smart Router algorithm service endpoint
+Name: ​
+Type: GET
+Parameters:
+Name
+Description
+fromToken
+Address of fromToken
+toToken
+Address of toToken
+amountIn
+Amount of the token to be swapped
+typeList
+Types available for the swap
+(PSM,CURVE,CURVE_COMBINATION,WTRX,SUNSWAP_V1,SUN
+_V2,SUNSWAP_V3)
+Return
+​
+Name
+Description
+amountIn
+Amount of the token entered (divided by precision)
+amountOut
+Amount of the token that can be swapped for, calculated by the Smart Router (divided by precision)
+InUsd
+USD price of the entered token
+OutUsd
+USD price of the token to be swapped for
+impact
+Price impact
+fee
+Transaction fee
+tokens
+Addresses of the tokens that the path from fromToken to toToken involves
+symbols
+Symbols of the tokens that the path from fromToken to toToken involves
+poolFees
+Transaction fees of the liquidity pools that the path from fromToken to toToken involves
+(0 is displayed for non-SunSwap V3 pools)
+poolVersions
+Versions of the liquidity pools that the path from fromToken to toToken involves
+stepAmountsOut
+Amounts of the tokens obtained from each pool along the path from fromToken to toToken
+​
+>>> curl 'https://rot.endjgfsv.link/swap/router?fromToken=TWrZRHY9aKQZcyjpovdH6qeCEyYZrRQDZt&toToken=TG9XJ75ZWcUw69W8xViEJZQ365fRupGkFP&amountIn=100000000000000000&typeList=PSM,CURVE,CURVE_COMBINATION,WTRX,SUNSWAP_V1,SUNSWAP_V2,SUNSWAP_V3'
+{"code":0,"message":"SUCCESS","data":[{"amountIn":"0.100000000000000000","amountOut":"0.00340809","inUsd":"0.000552211279796638800000000000000000","outUsd":"102.28490008408047256262147451","impact":"-0.004658","fee":"0.001019799010000000","tokens":["TWrZRHY9aKQZcyjpovdH6qeCEyYZrRQDZt","TGfVzt44kg6ZJ4fUqpHzJy3Jb37YMf8pMH","TGjgvdTWWrybVLaVeFqSyVqJQWjxqRYbaK","TG9XJ75ZWcUw69W8xViEJZQ365fRupGkFP"],"symbols":["SUN","HT","USDD","BTC"],"poolFees":["100","10000","100","0"],"poolVersions":["v3","v3","v3"],"stepAmountsOut":["0.204301041106368782","0.306491628388168604","0.00340809"]},{"amountIn":"0.100000000000000000","amountOut":"0.00315241","inUsd":"0.000552211279796638800000000000000000","outUsd":"94.61133417076900038177793499","impact":"-0.000471","fee":"0.001593109000000000","tokens":["TWrZRHY9aKQZcyjpovdH6qeCEyYZrRQDZt","TYsbWxNnyTgsZaTFaue9hqpxkU3Fkco94a","T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb","TF17BgPaZYbz8oxbjhriubPDsA7ArKoLX3","TG9XJ75ZWcUw69W8xViEJZQ365fRupGkFP"],"symbols":["SUN","WTRX","TRX","JST","BTC"],"poolFees":["0","0","0","10000","0"],"poolVersions":["v2","v2","v1","v3"],"stepAmountsOut":["9.406036","9.406036","5797.537373084257622564","0.00315241"]},{"amountIn":"0.100000000000000000","amountOut":"0.00311306","inUsd":"0.000552211279796638800000000000000000","outUsd":"93.43034692621015170250621534","impact":"-0.000305","fee":"0.001019799010000000","tokens":["TWrZRHY9aKQZcyjpovdH6qeCEyYZrRQDZt","TRz7J6dD2QWxBoumfYt4b3FaiRG23pXfop","TGjgvdTWWrybVLaVeFqSyVqJQWjxqRYbaK","TG9XJ75ZWcUw69W8xViEJZQ365fRupGkFP"],"symbols":["SUN","TUSD","USDD","BTC"],"poolFees":["10000","100","100","0"],"poolVersions":["v3","v3","v3"],"stepAmountsOut":["0.279484570175183752","0.279951568868017126","0.00311306"]}]}
+Trade Execution
+Trade
+Name: swapExactInput( address[], string[], uint256[], uint24[], SwapData)
+Parameters: array of paths, array of pool versions, array of lengths of adjacent pool versions, array of fee rates, [amount of the token to be swapped, minimum acceptable amount of the token obtained from the swap, address to receive the token obtained from the swap, deadline].
+​
+>>> let contract = await tronWeb.getContract('TQAvWQpT9H916GckwWDJNhYZvQMkuRL7PN')
+>>> await router.swapExactInput(
+                    ['TWrZRHY9aKQZcyjpovdH6qeCEyYZrRQDZt','TGfVzt44kg6ZJ4fUqpHzJy3Jb37YMf8pMH','TGjgvdTWWrybVLaVeFqSyVqJQWjxqRYbaK','TG9XJ75ZWcUw69W8xViEJZQ365fRupGkFP'],
+                    ['v3'],
+                    [4],
+                    [100,10000,100,0],
+                    ['100000000000000000','1', 'TF5MekHgFz6neU7zTpX4h2tha5miPDUj3z',1662825600]
+                ).send({feeLimit: 10000 * 1e6,shouldPollResponse: true});
+Smart Mining V1
+Smart Mining V1: A flexible on-demand mining mode
+Background
+As one of the digital financial derivatives on SUN.io, mining provides crypto holders with stable, secure and reliable services for investment product subscription and redemption. Smart Mining V1, also known as flexible mining, is an important part of SUN.io's mining service. It distributes rewards according to the share of users' staked assets in the mining pool's total stake amount. And users can redeem their assets anytime.
+ Explanation
+SUN.io's mining service distributes token rewards at an even inflation rate within a certain period of time, as shown in the graph below.
+Changes in the total staked assets in the mining pool at the time point ti will lead to changes in rewards for individual users, who are rewarded according to the following formula:r 
+t
+​
+denotes the expansion factor of token rewards,  
+t 
+i
+​
+denotes the i-th change, 
+S 
+i
+​
+denotes the total staked assets during the period from ti−1 to ti, and 
+U 
+i
+​
+denotes users' staked assets during the period from  
+−
+1
+t 
+i−1
+​
+to 
+t 
+i
+​
+ 
+.
+According to the above formula, changes in the mining pool’s total staked assets will affect the distribution of rewards for all users. In order to avoid high gas fees incurred from updating the reward distribution for every user, the above formula is altered to the following one:
+When the total staked assets in the mining pool have changed while the users' staked assets have not during the period from starti to endi, only the following summation formula needs to be updated:
+​
+Contract code
+modifier updateReward(address account) {
+    rewardPerTokenStored = rewardPerToken();
+    lastUpdateTime = lastTimeRewardApplicable();
+    if (canNext && block.timestamp > periodFinish && DURATION_NEXT > 0) {
+        rewardRate = rewardNext.div(DURATION_NEXT);
+        uint256 nextRound = (block.timestamp - periodFinish) / DURATION_NEXT + 1;
+        periodFinish = periodFinish.add(nextRound * DURATION_NEXT);
+        rewardPerTokenStored = rewardPerToken();
+        lastUpdateTime = lastTimeRewardApplicable();
+        rewardNow = rewardNext;
+        DURATION = DURATION_NEXT;
+        emit RewardAdded(nextRound * rewardNext);
+    }
+    if (account != address(0)) {
+        userInfo[account].rewards = earned(account);
+        userInfo[account].rewardPerTokenPaid = rewardPerTokenStored;
+    }
+    _;
+}
+Mining pools
+2pool farm
+Mainnet contract address:TFpg63byqDwniXnyxVYpSzBfWGBwZExM9J
+USDD-USDT V2 farm
+Mainnet contract address:TCkNadwxyik1D66qCGmavuneowDRXPgdkL
+Contract interaction We use TronWeb to interact with contracts. One can easily interact with online contracts after initializing TronWeb instances.
+const TronWeb = require('tronweb')
+const privateKey = process.env.PRIVATE_KEY
+const apiKey = process.env.API_KEY
+​
+var tronWeb = new TronWeb({
+	fullHost: "https://api.trongrid.io",
+	headers: { "TRON-PRO-API-KEY": apiKey },
+	privateKey: privateKey,
+      })
+     
+Get mining pool information
+View addresses of fixed-term/on-demand mining pools
+Function: reward_contract()
+>>> let contract = await tronWeb.getContract('TFpg63byqDwniXnyxVYpSzBfWGBwZExM9J')
+>>> await contract.methods.reward_contract().call()
+TWHM9Lkf78pHy68yhxdP8SUaRpn1hgaCpS
+  View rewards of on-demand mining pools
+Function:earned(address)
+Parameter: user's address
+>>> let contract = await tronWeb.getContract('TUgVp8FzZcFLHwruuncXaQo2js5Ym2GqSj')
+>>> await contract.methods.earned('TF5MekHgFz6neU7zTpX4h2tha5miPDUj3z').call()
+1000000000000000000
+Transaction execution
+Deposit
+Function：deposit(uint256)
+Parameter：Deposit amount
+>>> let contract = await tronWeb.getContract('TFpg63byqDwniXnyxVYpSzBfWGBwZExM9J')
+>>> await contract.methods.deposit(1000000000000000000).send()
+WithdrawalFunction：withdraw(uint256)
+Parameter：Withdrawal amount
+>>> let contract = await tronWeb.getContract('TFpg63byqDwniXnyxVYpSzBfWGBwZExM9J')
+>>> await contract.methods.withdraw(1000000000000000000).send()Smart Mining V2
+Smart Mining V2: A high-yield fixed-term mining mode
+Background
+As one of the digital financial derivatives on SUN.io, mining provides crypto holders with stable, secure, and reliable services for subscription and redemption of investment products. Smart Mining V2, also known as fixed-term mining, is an important part of SUN.io's mining service. It converts a user's staked assets to virtual assets of a certain amount according to the amount of assets staked and the staking duration. The total virtual stake is defined as the total amount of virtual assets converted from all users' staked assets. Users are rewarded based on their virtual assets' proportion in the total virtual stake, and they are only allowed to redeem their assets during a specified period of time.
+Explanation
+Reward Distribution
+Suppose the stake amount of a token is "amount". The token's lock-up duration 
+Duration 
+lock
+​
+meets the following condition: 
+<
+=
+<
+=
+Duration 
+min
+​
+ <=Duration 
+lock
+​
+ <=Duration 
+max
+​
+ 
+。 where 
+Duration 
+max
+​
+is 1080 days, 
+Duration 
+min
+​
+is 30 days, and the maximum acceleration rate
+ℎ
+weight 
+max
+​
+is 1400% (magnifying by 
+12
+e 
+12
+times). The veToken is calculated in the following way： 
+Here,
+balance 
+veToken
+​
+ 
+refers to the amount of a user's virtual assets. According to the reward distribution formula (2) of Smart Mining V1, the user's rewards are calculated in the following way:
+Here,  
+r 
+t
+​
+denotes the expansion factor of the reward token,  
+t 
+i
+​
+denotes the i-th change,  
+T 
+i
+​
+denotes the total virtual stake at the time 
+−
+1
+t 
+i−1
+​
+ 
+to 
+t 
+i
+​
+ 
+, and 
+balance 
+veToken
+​
+denotes the amount of the user's virtual assets at the time  
+−
+1
+t 
+i−1
+​
+ 
+to 
+t 
+i
+​
+ 
+.
+Contract code
+function calculateBoostedBalance(uint256 amount, uint256 lockDuration) public view returns (uint256) {
+    if (lockDuration == 0) {
+        return amount;
+    }
+    uint256 boostWeight = lockDuration.mul(BOOST_WEIGHT).div(DURATION_FACTOR);
+    return amount.add(amount.mul(boostWeight).div(PRECISION_FACTOR));
+}
+Redemption Time of Fixed-Term Mining
+​
+Duration 
+lock
+​
+denotes the length of a lock-up period, 
+Duration 
+maintenance
+​
+denotes the length of a cooling-off period for re-staking, 
+t 
+stake
+​
+denotes the time when the assets are staked, and 
+t 
+now
+​
+denotes the current time. Assets can be redeemed when the following conditions are both met: 
+rewards denotes the total amount of rewards, 
+rewards 
+prev
+​
+denotes the amount of settled rewards, 
+t 
+lastAction
+​
+denotes the time of the last settlement, and 
+Duration 
+reward
+​
+denotes the lock-up duration during which the rewards are not settled yet. 
+Duration 
+overdue
+​
+denotes the duration of time that is after the last lock-up period and shorter than a lock-up period. The user's rewards are calculated in the following way: 
+Contract code
+function overdueDuration(address account) public view returns (bool, uint256, uint256){
+    uint256 duration = userInfo[account].lockDuration;
+    if (duration == 0) {
+        return (true, 0, 0);
+    }
+    uint256 totalTime = block.timestamp.sub(userInfo[account].lockStartTime);
+    uint256 round = totalTime.div(duration);
+    uint256 overdue = totalTime.mod(duration);
+    if (round < 1 || overdue > maintenanceDuration || block.timestamp < userInfo[account].lastActionTime) {
+        return (false, 0, 0);
+    }
+​
+    uint256 rewardsDuration = block.timestamp.sub(userInfo[account].lastActionTime);
+    return (true, rewardsDuration, overdue);
+}
+Mining pools
+USDD_USDT LOCK V2 farm
+Mainnet contract address:TY1mxnpL18oDP8hsSrrxNZgUMj71pcyFS8
+2pool LOCK farm
+Mainnet contract address:TJmn1bjmNfE2F1sw2x6P224i8sFQj5mnbg
+Contract interaction 
+We use TronWeb to interact with contracts. One can easily interact with online contracts after initializing TronWeb instances.
+const TronWeb = require('tronweb')
+const privateKey = process.env.PRIVATE_KEY
+const apiKey = process.env.API_KEY
+​
+var tronWeb = new TronWeb({
+	fullHost: "https://api.trongrid.io",
+	headers: { "TRON-PRO-API-KEY": apiKey },
+	privateKey: privateKey,
+      })
+     
+Get mining pool information
+View addresses of fixed-term/on-demand mining pools
+Function: sub_pool()
+>>> let contract = await tronWeb.getContract('TJmn1bjmNfE2F1sw2x6P224i8sFQj5mnbg')
+>>> await contract.methods.sub_pool().call()
+TUgVp8FzZcFLHwruuncXaQo2js5Ym2GqSj
+  View rewards of on-demand mining pools
+Function:earned(address)
+Parameter: user's addres
+>>> let contract = await tronWeb.getContract('TUgVp8FzZcFLHwruuncXaQo2js5Ym2GqSj')
+>>> await contract.methods.earned('TF5MekHgFz6neU7zTpX4h2tha5miPDUj3z').call()
+1000000000000000000
+Transaction execution
+Deposit
+Function：deposit(uint256)
+Parameter：Deposit amount
+>>> let contract = await tronWeb.getContract('TJmn1bjmNfE2F1sw2x6P224i8sFQj5mnbg')
+>>> await contract.methods.deposit(1000000000000000000).send()
+Withdrawal
+Function：withdraw(uint256)
+Parameter：Withdrawal amount
+>>> let contract = await tronWeb.getContract('TJmn1bjmNfE2F1sw2x6P224i8sFQj5mnbg')
+>>> await contract.methods.withdraw(1000000000000000000).send()​
+Governance Mining
+Governance Mining: A mining mode that gives users more governance rights and rewards
+Background
+As one of the digital financial derivatives on SUN.io, mining provides crypto holders with stable, secure, and reliable services for subscription and redemption of investment products. Governance mining is an important part of SUN.io's mining service. As shown in the graph below, the reward distributed to users is closely related to the number of veSun tokens they hold and the weights of the liquidity pools. And users are free to redeem their assets at any time.Explanation
+After a user stakes tokens in a liquidity pool, a corresponding amount of virtual stake value will be generated:​
+L 
+user
+​
+represents the real value staked by the user. 
+L 
+total
+​
+is the total value staked in a liquidity pool. 
+veSun 
+user
+​
+is the number of veSun tokens held by the user. 
+veSun 
+total
+​
+is the total number of veSun tokens issued by SUN.io. As shown in formula (1), if the user holds enough veSun, then the virtue stake is indicated as 
+L 
+user
+​
+ 
+; if the user holds 0 veSun, then it is indicated as 
+L 
+user
+​
+* 0.4, meaning that the reward for holding veSUN can be amplified by 2.5 times.
+ 
+​
+W 
+gauge
+​
+represents the weekly gauge weight of the pool. 
+W 
+type
+​
+is the weight of the pool type. 
+W 
+total
+​
+is the total weight of the pool for the week and 
+r 
+t
+​
+is the expansion factor of the reward token. According to the reward distribution formula (2) of Smart Mining V1, the user's rewards are calculated in the following way:Here, V represents the final expansion factor of the reward token. 
+t 
+i
+​
+represents the i-th change.  
+T 
+i
+​
+represents the total virtual stake at the time 
+−
+1
+t 
+i−1
+​
+to 
+t 
+i
+​
+ 
+. 
+S 
+user
+​
+represents the user's virtual stake value at the time  
+−
+1
+t 
+i−1
+​
+to 
+t 
+i
+​
+ 
+. 
+Contract code
+def _checkpoint(addr: address):
+    Controller(_controller).checkpoint_gauge(convert(self.controller_key, bytes32))
+    _working_balance: uint256 = self.working_balances[addr]
+    _working_supply: uint256 = self.working_supply
+​
+    if block.timestamp > _period_time:
+        prev_week_time: uint256 = _period_time
+        week_time: uint256 = min((_period_time + WEEK) / WEEK * WEEK, block.timestamp)
+​
+        for i in range(500):
+            dt: uint256 = week_time - prev_week_time
+            w: uint256 = Controller(_controller).gauge_relative_weight(convert(self.controller_key, bytes32), prev_week_time / WEEK * WEEK)
+​
+            if _working_supply > 0:
+                if prev_future_epoch >= prev_week_time and prev_future_epoch < week_time:
+                    _integrate_inv_supply += rate * w * (prev_future_epoch - prev_week_time) / _working_supply
+                    rate = new_rate
+                    _integrate_inv_supply += rate * w * (week_time - prev_future_epoch) / _working_supply
+                else:
+                    _integrate_inv_supply += rate * w * dt / _working_supply
+            if week_time == block.timestamp:
+                break
+            prev_week_time = week_time
+            week_time = min(week_time + WEEK, block.timestamp)
+​
+    _period += 1
+    self.period = _period
+    self.period_timestamp[_period] = block.timestamp
+    self.integrate_inv_supply[_period] = _integrate_inv_supply
+      self.integrate_fraction[addr] += _working_balance * (_integrate_inv_supply - self.integrate_inv_supply_of[addr]) / 10 ** 18
+    self.integrate_inv_supply_of[addr] = _integrate_inv_supply
+    self.integrate_checkpoint_of[addr] = block.timestamp
+Mining Pools
+Old 3pool farm
+Mainnet contract address:TCpu3GnK6PPZV9ama85mRP97YqRuVXdcSd
+SUN-TRX farm
+Mainnet contract address:TAkrcKsS5FW9f3ZfzvWy6Zvsz9uEjUxPoV
+Old USDC farm
+Mainnet contract address:TJ3Qnm9VhzJzhcxk49ZpHBRatD1bsD4xYq
+USDT-SUN V2 farm
+Mainnet contract address:TPx8BXTgiB1tiL9A9BZuz67bZBvFGYdJS8
+BTT-USDT V2 farm
+Mainnet contract address:TEULJy4MJeRUTMPGTTvsBkmDPM4PEsMBTw
+USDT-TRX farm
+Mainnet contract address:TSRhvs1R2hoNf5PuMG4nUrDa4XVBqBaKgF
+USDJ-TRX farm
+Mainnet contract address:TGJ8LcijTaLmzBhqtp2jWQ1DRCpCWPAmD1
+TUSD-TRX farm
+Mainnet contract address:TBPEX4Bu3rc8RAvv3qTBFVvSVAFNttinqe
+USDC-TRX farm
+Mainnet contract address:TDsuMrbQ8wHrM8cKpxFczBbaxhJwpmwRHr
+WBTT-TRX farm
+Mainnet contract address:TH1XkkkPa7aF1oi7xqFYuUdXR1UvTEd4Ld
+BTT-TRX farm
+Mainnet contract address:TVjuRFx5dUn4u386DJRJS8zxgWKKcPocXo
+NFT-TRX farm
+Mainnet contract address:TViH23SgGKWfX4EHB4Q7UMeo1wgvfSvyPS
+WIN-TRX farm
+Mainnet contract address:TBd8sxVK47adcaLZgbqvN5LTUQGEpawXnx
+JST-TRX farm
+Mainnet contract address:TFw58b9t55FsmFeZHjLooS3SkMYDKXZoW7
+USDT-TRX V2 farm
+Mainnet contract address:TUnkvMyZKt4HT2qGWaMwy35c9QTmjiMCWL
+NFT-USDT V2 farm
+Mainnet contract address:TSYJHJA5rDYhaiadNXDqA6Fk6sq1yqZKwT
+WIN-USDT V2 farm
+Mainnet contract address:TEHtYRLUTGLq4Z5Pyy5C7LYZBBVVcRuvUU
+JST-USDT V2 farm
+Mainnet contract address:TKAQajxhQscgakWaokd7uNeTxwBp97xhSD
+USDD-USDT V2 farm
+Mainnet contract address:TCkNadwxyik1D66qCGmavuneowDRXPgdkL
+USDD-TRX farm
+Mainnet contract address:TCpXumigVHd2iuSkotNgkSduKqksUfpcvc
+3poolnew farm
+Mainnet contract address:THZgwb6LTg9LydbLw6gT4YMdu9y4nA5dnp
+Usdd2pool farm
+Mainnet contract address:TBSRZYLZ2pguF3EqLz86Kt9hZ4eqKEQMSY
+2pool farm
+Mainnet contract address:TFpg63byqDwniXnyxVYpSzBfWGBwZExM9J
+USDD_USDT LOCK V2 farm
+Mainnet contract address:TY1mxnpL18oDP8hsSrrxNZgUMj71pcyFS8
+2pool LOCK farm
+Mainnet contract address:TJmn1bjmNfE2F1sw2x6P224i8sFQj5mnbg
+Contract interaction 
+We use TronWeb to interact with contracts. One can easily interact with online contracts after initializing TronWeb instances.
+const TronWeb = require('tronweb')
+const privateKey = process.env.PRIVATE_KEY
+const apiKey = process.env.API_KEY
+​
+var tronWeb = new TronWeb({
+	fullHost: "https://api.trongrid.io",
+	headers: { "TRON-PRO-API-KEY": apiKey },
+	privateKey: privateKey,
+      })
+     
+Transaction execution
+View Governance Rewards
+Function：claimable_tokens(address)
+Parameter: user's address
+>>> let contract = await tronWeb.getContract('TJmn1bjmNfE2F1sw2x6P224i8sFQj5mnbg')
+>>> await contract.methods.claimable_tokens('TF5MekHgFz6neU7zTpX4h2tha5miPDUj3z').send()
+Deposit
+Function：deposit(uint256)
+Parameter：Deposit amount
+>>> let contract = await tronWeb.getContract('TJmn1bjmNfE2F1sw2x6P224i8sFQj5mnbg')
+>>> await contract.methods.deposit(1000000000000000000).send()
+WithdrawalFunction：withdraw(uint256)
+Parameter：Withdrawal amount
+>>> let contract = await tronWeb.getContract('TJmn1bjmNfE2F1sw2x6P224i8sFQj5mnbg')
+>>> await contract.methods.withdraw(1000000000000000000).send()
