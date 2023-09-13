@@ -9,7 +9,10 @@ import { TextLoader } from "langchain/document_loaders/fs/text";
 import { CSVLoader } from "langchain/document_loaders/fs/csv";
 import { PDFLoader } from "langchain/document_loaders/fs/pdf";
 
-import { RetrievalQAChain } from "langchain/chains";
+import {
+  ConversationalRetrievalQAChain,
+  RetrievalQAChain,
+} from "langchain/chains";
 import { HNSWLib } from "langchain/vectorstores/hnswlib";
 import { OpenAIEmbeddings } from "langchain/embeddings/openai";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
@@ -58,7 +61,9 @@ async function calculateCost(docs) {
 }
 
 const VECTOR_STORE_PATH = "vector";
-const question = "Describe in detail the benefits for veSUN Holders.";
+const question =
+  "As an end user, what are the core features available on Sunswap?";
+// const question = "Who is George Wasthington?";
 
 function normalizeDocuments(docs) {
   return docs.map((doc) => {
@@ -118,13 +123,12 @@ export const run = async () => {
   }
 
   console.log("Creating retrieval chain...");
+  // try out ConversationalRetrievalChain
   const chain = RetrievalQAChain.fromLLM(model, vectorStore.asRetriever());
 
   console.log("Querying chain...");
   const res = await chain.call({ query: question });
   console.log({ res });
 };
-
-// export const coreRouter = express.Router();
 
 run();
