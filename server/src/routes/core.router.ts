@@ -61,7 +61,7 @@ async function calculateCost() {
 }
 
 const VECTOR_STORE_PATH = "vector";
-const question = "What is Sunswap? Give me a detailed answer.";
+const question = "Who is George Wasthington?";
 
 function normalizeDocuments(docs) {
   return docs.map((doc) => {
