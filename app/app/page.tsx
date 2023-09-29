@@ -1,8 +1,25 @@
 "use client";
-import { Box, Text, HStack, Input, VStack, Spinner } from "@chakra-ui/react";
+import {
+  Box,
+  Text,
+  HStack,
+  Input,
+  VStack,
+  Spinner,
+  Image,
+} from "@chakra-ui/react";
 import { useState, useEffect, useRef } from "react";
 import styles from "./page.module.css";
 import { Search2Icon } from "@chakra-ui/icons";
+import { Wrap, WrapItem } from "@chakra-ui/react";
+
+const suggestions = [
+  "What is the TRON Virtual Machine (TVM)?",
+  "How does DPoS consensus work?",
+  "What is TRC-20, and how is it different from TRC-10 tokens on the TRON network?",
+  "How can I utilize TronGrid API for dApp development?",
+  "What is a Super Representatives?",
+];
 
 export default function Home() {
   const [question, setQuestion] = useState("");
@@ -12,9 +29,8 @@ export default function Home() {
   const indexRef = useRef(0); // persist the index across renders
   const [isLoading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: any) => {
-    e.preventDefault();
-    console.log("handle submit called with: ", question);
+  const submitQuestion = async (q: string) => {
+    console.log("handle submit called with: ", q);
 
     setAnswer("Generating your response. Please give us a moment...");
     setDisplayedText("G");
@@ -27,7 +43,7 @@ export default function Home() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ query: question }),
+      body: JSON.stringify({ query: q }),
     });
 
     const data = await response.json();
@@ -36,6 +52,16 @@ export default function Home() {
     setDisplayedText(data.text[0]);
     setTyping(true);
     setLoading(false);
+  };
+
+  const handleSubmitSuggestion = (s: string) => {
+    setQuestion(s);
+    submitQuestion(s);
+  };
+
+  const handleSubmit = (e: any) => {
+    e.preventDefault?.();
+    submitQuestion(question);
   };
 
   useEffect(() => {
@@ -56,6 +82,9 @@ export default function Home() {
 
   return (
     <VStack className={styles.main}>
+      <HStack className={styles.topbar}>
+        <Image src="/logo.png" alt="logo" className={styles.logo} />
+      </HStack>
       <Box className={styles.hero} />
       <VStack className={styles.container} gap={0}>
         <form onSubmit={handleSubmit} className={styles.form}>
@@ -65,22 +94,44 @@ export default function Home() {
               type="text"
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
+              onClick={() => setQuestion("")} // Empty the question state when the input is clicked
               placeholder="Ask your question here..."
               className={styles.input}
             />
           </HStack>
         </form>
-        {displayedText && (
-          <VStack width="100%" gap={0} alignItems="flex-start">
-            <Box className={styles.divider} />
+        <VStack width="100%" gap={0} alignItems="flex-start">
+          <Box className={styles.divider} />
+          {displayedText ? (
             <HStack width="100%" gap={0} justifyContent="flex-start">
               <Text whiteSpace="pre-line" className={styles.answer}>
                 {displayedText}
-                {isLoading && <Spinner className={styles.spinner} />}
               </Text>
+              {isLoading && <Spinner className={styles.spinner} />}
             </HStack>
-          </VStack>
-        )}
+          ) : (
+            <VStack
+              width="100%"
+              gap={15}
+              alignItems="flex-start"
+              padding="1.5rem"
+            >
+              <Text className={styles.label}>Suggestions</Text>
+              <Wrap width="100%" gap={0} justifyContent="flex-start">
+                {suggestions.map((s, idx) => (
+                  <WrapItem
+                    key={idx}
+                    whiteSpace="pre-line"
+                    className={styles.suggestion}
+                    onClick={() => handleSubmitSuggestion(s)}
+                  >
+                    {s}
+                  </WrapItem>
+                ))}
+              </Wrap>
+            </VStack>
+          )}
+        </VStack>
       </VStack>
     </VStack>
   );
@@ -88,3 +139,55 @@ export default function Home() {
 
 const dummyText =
   "One can validate on TRON by becoming a validator. To become a validator, one needs to stake their BTT tokens with staking management contracts residing on the TRON mainnet. Validators on the network are selected through an on-chain auction process which happens at regular intervals. These selected validators participate as block producers and verifiers. Once a checkpoint is validated by the participants, updates are made on the parent chain (the TRON mainnet) which releases the rewards for validators depending on their stake in network. The role of validators is to run a full node, produce blocks, validate and participate in consensus, and commit checkpoints on the TRON/BSC/Ethereum mainnet.";
+
+// const handleSubmitSuggestion = async (s: string) => {
+//   setQuestion(s);
+//   console.log("handle submit called with: ", s);
+
+//   setAnswer("Generating your response. Please give us a moment...");
+//   setDisplayedText("G");
+//   setTyping(true);
+
+//   setTimeout(() => setLoading(true), 800);
+
+//   const response = await fetch("http://localhost:8000/chat", {
+//     method: "POST",
+//     headers: {
+//       "Content-Type": "application/json",
+//     },
+//     body: JSON.stringify({ query: s }),
+//   });
+
+//   const data = await response.json();
+
+//   setAnswer(data.text || "");
+//   setDisplayedText(data.text[0]);
+//   setTyping(true);
+//   setLoading(false);
+// };
+
+// const handleSubmit = async (e: any) => {
+//   e.preventDefault?.(); // Use optional chaining to call preventDefault only if it exists
+//   console.log("handle submit called with: ", question);
+
+//   setAnswer("Generating your response. Please give us a moment...");
+//   setDisplayedText("G");
+//   setTyping(true);
+
+//   setTimeout(() => setLoading(true), 800);
+
+//   const response = await fetch("http://localhost:8000/chat", {
+//     method: "POST",
+//     headers: {
+//       "Content-Type": "application/json",
+//     },
+//     body: JSON.stringify({ query: question }),
+//   });
+
+//   const data = await response.json();
+
+//   setAnswer(data.text || "");
+//   setDisplayedText(data.text[0]);
+//   setTyping(true);
+//   setLoading(false);
+// };
