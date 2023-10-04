@@ -3,191 +3,94 @@ import {
   Box,
   Text,
   HStack,
-  Input,
   VStack,
-  Spinner,
   Image,
+  Button,
+  ScaleFade,
+  useDisclosure,
 } from "@chakra-ui/react";
-import { useState, useEffect, useRef } from "react";
+import { useEffect } from "react";
 import styles from "./page.module.css";
-import { Search2Icon } from "@chakra-ui/icons";
-import { Wrap, WrapItem } from "@chakra-ui/react";
-
-const suggestions = [
-  "What is the TRON Virtual Machine (TVM)?",
-  "How does DPoS consensus work?",
-  "What is TRC-20, and how is it different from TRC-10 tokens on the TRON network?",
-  "How can I utilize TronGrid API for dApp development?",
-  "What is a Super Representatives?",
-];
+import { useRouter } from "next/navigation";
 
 export default function Home() {
-  const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");
-  const [displayedText, setDisplayedText] = useState("");
-  const [typing, setTyping] = useState(false);
-  const indexRef = useRef(0); // persist the index across renders
-  const [isLoading, setLoading] = useState(false);
-
-  const submitQuestion = async (q: string) => {
-    console.log("handle submit called with: ", q);
-
-    setAnswer("Generating your response. Please give us a moment...");
-    setDisplayedText("G");
-    setTyping(true);
-
-    setTimeout(() => setLoading(true), 800);
-
-    const response = await fetch("http://localhost:8000/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ query: q }),
-    });
-
-    const data = await response.json();
-
-    setAnswer(data.text || "");
-    setDisplayedText(data.text[0]);
-    setTyping(true);
-    setLoading(false);
-  };
-
-  const handleSubmitSuggestion = (s: string) => {
-    setQuestion(s);
-    submitQuestion(s);
-  };
-
-  const handleSubmit = (e: any) => {
-    e.preventDefault?.();
-    submitQuestion(question);
-  };
+  const { isOpen, onToggle } = useDisclosure();
+  const router = useRouter();
 
   useEffect(() => {
-    if (typing) {
-      if (indexRef.current < answer.length - 1) {
-        const timer = setTimeout(() => {
-          setDisplayedText((prevText) => prevText + answer[indexRef.current]);
-          indexRef.current++;
-        }, 10);
-
-        return () => clearTimeout(timer);
-      } else {
-        setTyping(false);
-        indexRef.current = 0; // Reset the index when typing is done
-      }
-    }
-  }, [displayedText, typing, answer]);
+    onToggle();
+  }, []);
 
   return (
-    <VStack className={styles.main}>
-      <HStack className={styles.topbar}>
+    <VStack className={styles.landing}>
+      <HStack className={styles.topbarLanding}>
         <Image src="/logo.png" alt="logo" className={styles.logo} />
+        <Button
+          className={styles.button}
+          onClick={() => {
+            router.push("/chat");
+          }}
+        >
+          Launch Chat
+        </Button>
       </HStack>
       <Box className={styles.hero} />
-      <VStack className={styles.container} gap={0}>
-        <form onSubmit={handleSubmit} className={styles.form}>
-          <HStack className={styles.queryContainer}>
-            <Search2Icon className={styles.icon} />
-            <Input
-              type="text"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              onClick={() => setQuestion("")} // Empty the question state when the input is clicked
-              placeholder="Ask your question here..."
-              className={styles.input}
-            />
-          </HStack>
-        </form>
-        <VStack width="100%" gap={0} alignItems="flex-start">
-          <Box className={styles.divider} />
-          {displayedText ? (
-            <HStack width="100%" gap={0} justifyContent="flex-start">
-              <Text whiteSpace="pre-line" className={styles.answer}>
-                {displayedText}
-              </Text>
-              {isLoading && <Spinner className={styles.spinner} />}
-            </HStack>
-          ) : (
-            <VStack
-              width="100%"
-              gap={15}
-              alignItems="flex-start"
-              padding="1.5rem"
+      <ScaleFade initialScale={0.8} in={isOpen}>
+        <HStack gap={40} pb="4rem">
+          <VStack alignItems="flex-start" gap={20}>
+            <Text className={styles.title}>
+              AI-powered chat for the TRON ecosystem
+            </Text>
+            <Text className={styles.subtitle}>
+              Navitron is the simplest way to explore and interact with the
+              latest project docs in the TRON ecosystem.
+            </Text>
+            <Button
+              className={styles.button2}
+              onClick={() => {
+                router.push("/chat");
+              }}
             >
-              <Text className={styles.label}>Suggestions</Text>
-              <Wrap width="100%" gap={0} justifyContent="flex-start">
-                {suggestions.map((s, idx) => (
-                  <WrapItem
-                    key={idx}
-                    whiteSpace="pre-line"
-                    className={styles.suggestion}
-                    onClick={() => handleSubmitSuggestion(s)}
-                  >
-                    {s}
-                  </WrapItem>
-                ))}
-              </Wrap>
+              Launch Chat
+            </Button>
+          </VStack>
+          <Image
+            src="/sample.png"
+            alt="sample query"
+            className={styles.sample}
+          />
+        </HStack>
+        <VStack>
+          <Text className={styles.sectionHeader}>
+            One-stop shop for the TRON ecosystem:
+          </Text>
+          <HStack>
+            <VStack className={styles.feature}>
+              <Text className={styles.header}>Seamless UI</Text>
+              <Text className={styles.content}>
+                NaviTron offers a custom-designed chat interface that allows
+                users to interact seamlessly with the tailored AI model.
+              </Text>
             </VStack>
-          )}
+            <Box className={styles.divider2} />
+            <VStack className={styles.feature}>
+              <Text className={styles.header}>Latest Knowledge</Text>
+              <Text className={styles.content}>
+                NaviTron is powered by a Langchain model with extensive
+                knowledge about the latest in the TRON ecosystem.
+              </Text>
+            </VStack>
+            <Box className={styles.divider2} />
+            <VStack className={styles.feature}>
+              <Text className={styles.header}>HackaTRON Insights</Text>
+              <Text className={styles.content}>
+                NaviTron provides insights into various winning projects from
+                previously hosted HackaTRON seasons.
+              </Text>
+            </VStack>
+          </HStack>
         </VStack>
-      </VStack>
+      </ScaleFade>
     </VStack>
   );
 }
-
-const dummyText =
-  "One can validate on TRON by becoming a validator. To become a validator, one needs to stake their BTT tokens with staking management contracts residing on the TRON mainnet. Validators on the network are selected through an on-chain auction process which happens at regular intervals. These selected validators participate as block producers and verifiers. Once a checkpoint is validated by the participants, updates are made on the parent chain (the TRON mainnet) which releases the rewards for validators depending on their stake in network. The role of validators is to run a full node, produce blocks, validate and participate in consensus, and commit checkpoints on the TRON/BSC/Ethereum mainnet.";
-
-// const handleSubmitSuggestion = async (s: string) => {
-//   setQuestion(s);
-//   console.log("handle submit called with: ", s);
-
-//   setAnswer("Generating your response. Please give us a moment...");
-//   setDisplayedText("G");
-//   setTyping(true);
-
-//   setTimeout(() => setLoading(true), 800);
-
-//   const response = await fetch("http://localhost:8000/chat", {
-//     method: "POST",
-//     headers: {
-//       "Content-Type": "application/json",
-//     },
-//     body: JSON.stringify({ query: s }),
-//   });
-
-//   const data = await response.json();
-
-//   setAnswer(data.text || "");
-//   setDisplayedText(data.text[0]);
-//   setTyping(true);
-//   setLoading(false);
-// };
-
-// const handleSubmit = async (e: any) => {
-//   e.preventDefault?.(); // Use optional chaining to call preventDefault only if it exists
-//   console.log("handle submit called with: ", question);
-
-//   setAnswer("Generating your response. Please give us a moment...");
-//   setDisplayedText("G");
-//   setTyping(true);
-
-//   setTimeout(() => setLoading(true), 800);
-
-//   const response = await fetch("http://localhost:8000/chat", {
-//     method: "POST",
-//     headers: {
-//       "Content-Type": "application/json",
-//     },
-//     body: JSON.stringify({ query: question }),
-//   });
-
-//   const data = await response.json();
-
-//   setAnswer(data.text || "");
-//   setDisplayedText(data.text[0]);
-//   setTyping(true);
-//   setLoading(false);
-// };
