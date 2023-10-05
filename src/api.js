@@ -30,24 +30,6 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
-app.post("/chat", async (req, res) => {
-  try {
-    const question = req.body.query;
-    if (!question) {
-      return res.status(400).send({ error: "Query field is required" });
-    }
-
-    const answer = await getAnswer(question);
-    res.send(answer);
-  } catch (error) {
-    res.status(500).send({ error: "Internal Server Error" });
-  }
-});
-
-app.listen(port, () => {
-  console.log(`⚡️[server]: Server is running at https://localhost:${port}`);
-});
-
 const loader = new DirectoryLoader(
   "data",
   {
@@ -74,6 +56,7 @@ function normalizeDocuments(docs) {
     }
   });
 }
+
 async function getAnswer(question) {
   console.log("Loading docs...");
   const docs = await loader.load();
@@ -129,3 +112,21 @@ async function getAnswer(question) {
   const res = await chain.call({ query: question });
   return res;
 }
+
+app.post("/chat", async (req, res) => {
+  try {
+    const question = req.body.query;
+    if (!question) {
+      return res.status(400).send({ error: "Query field is required" });
+    }
+
+    const answer = await getAnswer(question);
+    res.send(answer);
+  } catch (error) {
+    res.status(500).send({ error: "Internal Server Error" });
+  }
+});
+
+app.listen(port, () => {
+  console.log(`⚡️[server]: Server is running at https://localhost:${port}`);
+});
