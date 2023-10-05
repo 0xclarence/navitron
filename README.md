@@ -6,6 +6,8 @@ When users search for "TRON Ecosystem" on popular search engines like Google, th
 ## Introduction
 NaviTron is a state-of-the-art TRON ecosystem navigation AI, leveraging the power of LangChain and GPT-4. Our team has trained a vector model using comprehensive documentation and feature sets from a curated list of dapps within the TRON ecosystem.
 
+![](app/public/landing.png)
+
 ## Quick Test
 1. Visit [NaviTron](https://navitron.xyz).
 2. Engage in a conversation with NaviTron about the TRON ecosystem.
