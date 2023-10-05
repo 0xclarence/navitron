@@ -19,20 +19,23 @@ NaviTron is a state-of-the-art TRON ecosystem navigation AI, leveraging the powe
 - **Direct Dapp Links**: Provides users with direct links to the dapp's webpage for easy navigation.
 - **TRON Hackathon Insights (Bonus Feature)**: Gain insights into various winning projects from all TRON hackathon seasons.
 
-## Currently Supported Dapps (more to come)
+## Currently Supported Projects (more to come)
 - Sunswap
 - Transit Swap
 - Bitget Swap
-- Justlend DAO
-- Bridgers
-- OKX DEX
+- Justlend
 - TronNRG
 - SocialSwap
-- LUMINOUS
-- JustMoney Swap
-- Tron Sharks
-- PayDay Miner
+- JustMoney
+- JustStable
 - stUSDT
+- APENFT
+- BTTC
+- BTFS
+- Stablecoins
+- Transitswap
+- Tronlink
+- Tronscan
 - HackaTRON winner projects
 
 ## Future Roadmap
