@@ -38,7 +38,6 @@ app.post("/chat", async (req, res) => {
     }
 
     const answer = await getAnswer(question);
-    console.log("res on server:", answer);
     res.send(answer);
   } catch (error) {
     res.status(500).send({ error: "Internal Server Error" });
@@ -50,7 +49,7 @@ app.listen(port, () => {
 });
 
 const loader = new DirectoryLoader(
-  "flatdata",
+  "data",
   {
     ".json": (path) => new JSONLoader(path, "/texts"),
     ".jsonl": (path) => new JSONLinesLoader(path, "/html"),
@@ -128,5 +127,5 @@ async function getAnswer(question) {
 
   console.log("Querying chain...");
   const res = await chain.call({ query: question });
-  return res; // Assuming res contains the answer you want to return
+  return res;
 }
