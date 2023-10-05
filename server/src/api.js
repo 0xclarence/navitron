@@ -58,12 +58,7 @@ function normalizeDocuments(docs) {
 }
 
 async function getAnswer(question) {
-  console.log("Loading docs...");
   try {
-    const docs = await loader.load();
-
-    console.log("Docs loaded. ");
-
     const model = new OpenAI({
       modelName: "gpt-4",
       openAIApiKey: process.env.API_KEY,
@@ -86,6 +81,9 @@ async function getAnswer(question) {
       );
       console.log("Vector store loaded.");
     } else {
+      console.log("Loading docs...");
+      const docs = await loader.load();
+      console.log("Docs loaded. ");
       console.log("Creating new vector store...");
       const textSplitter = new RecursiveCharacterTextSplitter({
         chunkSize: 1000,
