@@ -71,6 +71,7 @@
   color: rgba(255, 255, 255, 0.5);
   font-size: 16px;
   font-weight: 400;
+  z-index: 99;
 }
 
 .input:focus {
@@ -94,6 +95,7 @@
   line-height: 2rem;
   padding: 1.5rem;
   text-align: left;
+  z-index: 99;
 }
 
 .suggestion {
@@ -240,4 +242,14 @@
 .feature {
   align-items: flex-start !important;
   padding: 2rem;
+}
+
+.sources {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 16px;
+  font-weight: 400;
+  align-items: flex-start !important;
+  padding: 1.5rem;
+  padding-top: 0;
+  z-index: 98;
 }

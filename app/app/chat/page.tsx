@@ -39,8 +39,6 @@ export default function Home() {
   }, []);
 
   const submitQuestion = async (q: string) => {
-    console.log("handle submit called with: ", q);
-
     setAnswer("Generating your response. Please give us a moment...");
     setDisplayedText("G");
     setTyping(true);
@@ -111,7 +109,7 @@ export default function Home() {
                 type="text"
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
-                onClick={() => setQuestion("")} // Empty the question state when the input is clicked
+                onClick={() => setQuestion("")}
                 placeholder="Ask your question here..."
                 className={styles.input}
               />
@@ -154,6 +152,3 @@ export default function Home() {
     </VStack>
   );
 }
-
-const dummyText =
-  "One can validate on TRON by becoming a validator. To become a validator, one needs to stake their BTT tokens with staking management contracts residing on the TRON mainnet. Validators on the network are selected through an on-chain auction process which happens at regular intervals. These selected validators participate as block producers and verifiers. Once a checkpoint is validated by the participants, updates are made on the parent chain (the TRON mainnet) which releases the rewards for validators depending on their stake in network. The role of validators is to run a full node, produce blocks, validate and participate in consensus, and commit checkpoints on the TRON/BSC/Ethereum mainnet.";
