@@ -59,58 +59,63 @@ function normalizeDocuments(docs) {
 
 async function getAnswer(question) {
   console.log("Loading docs...");
-  const docs = await loader.load();
-  console.log("Docs loaded. ");
+  try {
+    const docs = await loader.load();
 
-  const model = new OpenAI({
-    modelName: "gpt-4",
-    openAIApiKey: process.env.API_KEY,
-    temperature: 0.9,
-  });
+    console.log("Docs loaded. ");
 
-  let vectorStore;
-
-  console.log("Checking for existing vector store...");
-
-  if (fs.existsSync(VECTOR_STORE_PATH)) {
-    console.log("Loading existing vector store...");
-    vectorStore = await HNSWLib.load(
-      VECTOR_STORE_PATH,
-      new OpenAIEmbeddings({
-        modelName: "text-embedding-ada-002",
-        openAIApiKey: process.env.API_KEY,
-        stripNewLines: true,
-      })
-    );
-    console.log("Vector store loaded.");
-  } else {
-    console.log("Creating new vector store...");
-    const textSplitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 1000,
+    const model = new OpenAI({
+      modelName: "gpt-4",
+      openAIApiKey: process.env.API_KEY,
+      temperature: 0.9,
     });
-    const normalizedDocs = normalizeDocuments(docs);
-    const splitDocs = await textSplitter.createDocuments(normalizedDocs);
 
-    vectorStore = await HNSWLib.fromDocuments(
-      splitDocs,
-      new OpenAIEmbeddings({
-        modelName: "text-embedding-ada-002",
-        openAIApiKey: process.env.API_KEY,
-        stripNewLines: true,
-      })
-    );
+    let vectorStore;
 
-    await vectorStore.save(VECTOR_STORE_PATH);
+    console.log("Checking for existing vector store...");
 
-    console.log("Vector store created.");
+    if (fs.existsSync(VECTOR_STORE_PATH)) {
+      console.log("Loading existing vector store...");
+      vectorStore = await HNSWLib.load(
+        VECTOR_STORE_PATH,
+        new OpenAIEmbeddings({
+          modelName: "text-embedding-ada-002",
+          openAIApiKey: process.env.API_KEY,
+          stripNewLines: true,
+        })
+      );
+      console.log("Vector store loaded.");
+    } else {
+      console.log("Creating new vector store...");
+      const textSplitter = new RecursiveCharacterTextSplitter({
+        chunkSize: 1000,
+      });
+      const normalizedDocs = normalizeDocuments(docs);
+      const splitDocs = await textSplitter.createDocuments(normalizedDocs);
+
+      vectorStore = await HNSWLib.fromDocuments(
+        splitDocs,
+        new OpenAIEmbeddings({
+          modelName: "text-embedding-ada-002",
+          openAIApiKey: process.env.API_KEY,
+          stripNewLines: true,
+        })
+      );
+
+      await vectorStore.save(VECTOR_STORE_PATH);
+
+      console.log("Vector store created.");
+    }
+
+    console.log("Creating retrieval chain...");
+    const chain = RetrievalQAChain.fromLLM(model, vectorStore.asRetriever());
+
+    console.log("Querying chain...");
+    const res = await chain.call({ query: question });
+    return res;
+  } catch (err) {
+    console.error(err);
   }
-
-  console.log("Creating retrieval chain...");
-  const chain = RetrievalQAChain.fromLLM(model, vectorStore.asRetriever());
-
-  console.log("Querying chain...");
-  const res = await chain.call({ query: question });
-  return res;
 }
 
 app.post("/chat", async (req, res) => {

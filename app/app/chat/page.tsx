@@ -45,7 +45,7 @@ export default function Home() {
 
     setTimeout(() => setLoading(true), 800);
 
-    const response = await fetch("http://localhost:8000/chat", {
+    const response = await fetch("https://navitron-api.onrender.com/chat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
